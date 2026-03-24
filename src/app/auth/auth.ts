@@ -16,6 +16,7 @@ export class Auth {
   private nakamaService = inject(NakamaService);
 
   isLoginMode = signal(true);
+  showPassword = signal(false);
   
   // Form fields
   email = signal('');
@@ -37,6 +38,10 @@ export class Auth {
   toggleMode() {
     this.isLoginMode.set(!this.isLoginMode());
     this.clearErrors();
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword.set(!this.showPassword());
   }
 
   clearErrors() {

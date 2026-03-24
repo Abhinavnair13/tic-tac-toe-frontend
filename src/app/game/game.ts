@@ -121,11 +121,40 @@ export class Game implements OnInit, OnDestroy {
   confirmForfeit() {
     this.showForfeitModal.set(false);
     this.nakamaService.leaveMatch();
+    setTimeout(() => {
+      this.nakamaService.fetchMyTrophies();
+    }, 500);
     this.router.navigate(['/home']);
   }
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.sub) this.sub.unsubscribe();
+  }
+  // NEW: Check if the win was due to a forfeit
+  isForfeitWin(): boolean {
+    const state = this.gameState();
+    if (!state) return false;
+    
+    const winner = this.getWinner();
+    if (!winner || winner === 'DRAW') return false;
+
+    const board = state.board || [0,0,0,0,0,0,0,0,0];
+    return !this.hasWinningLine(board);
+  }
+
+  // NEW: Helper to scan the board for an actual 3-in-a-row
+  private hasWinningLine(board: number[]): boolean {
+    const lines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
+      [0, 4, 8], [2, 4, 6]             // diagonals
+    ];
+    for (const [a, b, c] of lines) {
+      if (board[a] !== 0 && board[a] === board[b] && board[a] === board[c]) {
+        return true; // Someone actually connected 3!
+      }
+    }
+    return false; 
   }
 }

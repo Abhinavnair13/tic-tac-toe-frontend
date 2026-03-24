@@ -1,4 +1,5 @@
 import { Injectable, signal,NgZone,inject} from '@angular/core';
+import { Router } from '@angular/router';
 import { Client, Session, Socket, MatchData } from '@heroiclabs/nakama-js';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { GameState } from '../models/game-state.model';
@@ -14,6 +15,7 @@ export class NakamaService {
   private socket!: Socket;
 
   private zone = inject(NgZone);
+  private router = inject(Router);
   public myTrophies = signal<number>(0);
   private matchId: string | null = null;
   private matchmakerTicket: string | null = null;
@@ -136,21 +138,29 @@ export class NakamaService {
       this.matchmakerTicket = null;
       this.matchStatus.set('LOGIN');
       if (this.queuePingInterval) clearInterval(this.queuePingInterval);
+      this.zone.run(() => {
+        this.router.navigate(['/home']);
+      });
     } catch (err) {
       console.error('Failed to cancel matchmaking', err);
     }
   }
 
-  async leaveMatch() {
-    if (!this.socket || !this.matchId) return;
+ async leaveMatch() {
+    if (!this.socket || !this.matchId) {
+      this.gameStateSubject.next(null); // Catch-all
+      return;
+    }
     try {
+      // This might throw an error if the server already destroyed the match instance
       await this.socket.leaveMatch(this.matchId);
+    } catch (err) {
+      console.warn('Match already closed on server.');
+    } finally {
       this.matchId = null;
       this.matchStatus.set('LOGIN');
       if (this.pingInterval) clearInterval(this.pingInterval);
-      this.gameStateSubject.next(null);
-    } catch (err) {
-      console.error('Failed to leave match', err);
+      this.gameStateSubject.next(null); 
     }
   }
 

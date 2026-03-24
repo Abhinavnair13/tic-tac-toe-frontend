@@ -52,7 +52,9 @@
       <div *ngIf="getWinner() !== myUserId && getWinner() !== 'DRAW'" class="result-icon">💀</div>
       <div *ngIf="getWinner() === 'DRAW'" class="result-icon">🤝</div>
 
-      <h2 *ngIf="getWinner() === myUserId" class="win-text">You Won!</h2>
+      <h2 *ngIf="getWinner() === myUserId && !isForfeitWin()" class="win-text">You Won!</h2>
+      <h2 *ngIf="getWinner() === myUserId && isForfeitWin()" class="win-text">Opponent Forfeited!</h2>
+      
       <h2 *ngIf="getWinner() !== myUserId && getWinner() !== 'DRAW'" class="lose-text">You Lost!</h2>
       <h2 *ngIf="getWinner() === 'DRAW'" class="draw-text">It's a Draw!</h2>
       
