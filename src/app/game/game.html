@@ -1,0 +1,74 @@
+<div class="game-wrapper">
+
+  <div class="queue-overlay" *ngIf="matchStatus() === 'QUEUE'">
+    <div class="spinner"></div>
+    <h3>Finding a random player...</h3>
+    <button class="btn-cancel mt-4" (click)="nakamaService.cancelMatchmaking()">Cancel Search</button>
+  </div>
+
+  <div class="match-container" *ngIf="matchStatus() === 'ACTIVE' && gameState()">
+    
+    <div class="game-header">
+      <div class="turn-indicator" [class.my-turn]="isMyTurn()">
+        {{ isMyTurn() ? "Your Turn" : "Opponent's Turn" }}
+      </div>
+      <div class="timer" [class.low-time]="timeLeft() <= 5">
+        {{ timeLeft() }}s
+      </div>
+    </div>
+
+    <div class="board">
+      <div 
+        *ngFor="let cell of gameState().board; let i = index" 
+        class="cell"
+        [class.played]="cell !== 0"
+        (click)="makeMove(i)">
+        <span *ngIf="cell === 1" class="mark p1">X</span>
+        <span *ngIf="cell === 2" class="mark p2">O</span>
+      </div>
+    </div>
+
+    <div class="forfeit-container">
+      <button class="btn-cancel" (click)="showForfeitModal.set(true)">Forfeit Match</button>
+    </div>
+
+  </div>
+
+  <div class="game-over-overlay" *ngIf="showForfeitModal()">
+    <div class="game-over-card">
+      <h2 class="lose-text">Forfeit Match?</h2>
+      <p style="color: white; margin-bottom: 24px;">Are you sure you want to forfeit? Your opponent will win.</p>
+      <div style="display: flex; justify-content: center; gap: 16px;">
+        <button class="btn-cancel" (click)="showForfeitModal.set(false)">No</button>
+        <button class="btn-primary" (click)="confirmForfeit()">Yes, Forfeit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="game-over-overlay" *ngIf="getWinner()">
+    <div class="game-over-card">
+      
+      <div *ngIf="getWinner() === myUserId" class="result-icon">🏆</div>
+      <div *ngIf="getWinner() !== myUserId && getWinner() !== 'DRAW'" class="result-icon">💀</div>
+      <div *ngIf="getWinner() === 'DRAW'" class="result-icon">🤝</div>
+
+      <h2 *ngIf="getWinner() === myUserId" class="win-text">You Won!</h2>
+      <h2 *ngIf="getWinner() !== myUserId && getWinner() !== 'DRAW'" class="lose-text">You Lost!</h2>
+      <h2 *ngIf="getWinner() === 'DRAW'" class="draw-text">It's a Draw!</h2>
+      
+      <p *ngIf="getWinner() === myUserId" class="trophy-subtext">+10 Trophies added to your profile</p>
+      <p *ngIf="getWinner() !== myUserId && getWinner() !== 'DRAW'" class="trophy-subtext">-2 Trophies</p>
+
+      <button class="btn-primary mt-3" (click)="goToHome()" style="width: 100%;">
+        Return to Home
+      </button>
+
+    </div>
+  </div>
+
+  <div class="ping-indicator" *ngIf="matchStatus() === 'ACTIVE' || matchStatus() === 'QUEUE'">
+    <span class="ping-dot" [class.good]="ping() < 100" [class.warn]="ping() >= 100 && ping() < 250" [class.bad]="ping() >= 250"></span>
+    {{ ping() }}ms
+  </div>
+
+</div>

@@ -1,0 +1,50 @@
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h2>{{ isLoginMode() ? 'Welcome Back' : 'Create Account' }}</h2>
+      <p>Sign in to play LILA Tic-tac-toe</p>
+    </div>
+
+    <form class="auth-form" (ngSubmit)="submit()">
+      <ng-container *ngIf="!isLoginMode()">
+        <div class="field-group">
+          <input type="text" placeholder="First Name" [ngModel]="firstName()" (ngModelChange)="firstName.set($event)" name="firstName" required class="input-field" [class.error-input]="firstNameError()" />
+          <div class="field-error" *ngIf="firstNameError()">{{ firstNameError() }}</div>
+        </div>
+        <div class="field-group">
+          <input type="text" placeholder="Last Name" [ngModel]="lastName()" (ngModelChange)="lastName.set($event)" name="lastName" required class="input-field" [class.error-input]="lastNameError()" />
+          <div class="field-error" *ngIf="lastNameError()">{{ lastNameError() }}</div>
+        </div>
+        <div class="field-group">
+          <input type="text" placeholder="Username" [ngModel]="username()" (ngModelChange)="username.set($event)" name="username" required class="input-field" [class.error-input]="usernameError()" />
+          <div class="field-error" *ngIf="usernameError()">{{ usernameError() }}</div>
+        </div>
+      </ng-container>
+
+      <div class="field-group">
+        <input type="email" placeholder="Email Address" [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" required class="input-field" [class.error-input]="emailError()" />
+        <div class="field-error" *ngIf="emailError()">{{ emailError() }}</div>
+      </div>
+
+      <div class="field-group">
+        <input type="password" placeholder="Password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" required class="input-field" [class.error-input]="passwordError()" />
+        <div class="field-error" *ngIf="passwordError()">{{ passwordError() }}</div>
+      </div>
+
+      <div class="error-msg" *ngIf="errorMessage()">
+        {{ errorMessage() }}
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="isLoading()">
+        {{ isLoading() ? 'Loading...' : (isLoginMode() ? 'Login' : 'Sign Up') }}
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p>
+        {{ isLoginMode() ? "Don't have an account?" : "Already have an account?" }}
+        <a href="javascript:void(0)" (click)="toggleMode()">{{ isLoginMode() ? 'Sign Up' : 'Login' }}</a>
+      </p>
+    </div>
+  </div>
+</div>

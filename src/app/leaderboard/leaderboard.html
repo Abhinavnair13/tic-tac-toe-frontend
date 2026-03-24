@@ -1,0 +1,34 @@
+<div class="leaderboard-wrapper">
+  
+  <div class="header">
+    <h2>Global Trophies</h2>
+    <p>Top players around the world</p>
+  </div>
+
+  <div class="list-container" *ngIf="!isLoading()">
+    <div *ngIf="records().length === 0" class="empty-state">
+      <p>No records found yet.</p>
+    </div>
+
+    <div 
+      *ngFor="let record of records()" 
+      class="record-row"
+      [class.gold]="record.rank === 1"
+      [class.silver]="record.rank === 2"
+      [class.bronze]="record.rank === 3"
+    >
+      <div class="rank">#{{ record.rank }}</div>
+      <div class="username">{{ record.username }}</div>
+      <div class="score">{{ record.score }} 🏆</div>
+    </div>
+  </div>
+
+  <div class="spinner-container" *ngIf="isLoading()">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="bottom-actions">
+    <button class="btn-primary" (click)="goToHome()">Back to Home</button>
+  </div>
+
+</div>
