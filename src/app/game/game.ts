@@ -113,6 +113,23 @@ export class Game implements OnInit, OnDestroy {
     const s = this.gameState(); 
     return s ? Number(s.p2TimeUsed || s.p2_time_used || 0) : 0;
   }
+  opponentDisconnectTime(): number {
+    const s = this.gameState();
+    if (!s) return 0;
+    const p1 = s.p1Id || s.p1_id;
+    // Return the other guy's disconnect time
+    if (this.myUserId === p1) return Number(s.p2DisconnectTime || s.p2_disconnect_time || 0);
+    return Number(s.p1DisconnectTime || s.p1_disconnect_time || 0);
+  }
+
+  opponentReconnectCountdown(): number {
+    const dTime = this.opponentDisconnectTime();
+    if (dTime === 0) return 0;
+    
+    const now = Math.floor(Date.now() / 1000);
+    const elapsed = now - dTime;
+    return Math.max(0, 15 - elapsed);
+  }
 
   getEarnedTrophies(): number {
     if (this.isTimedMode()) return 10;

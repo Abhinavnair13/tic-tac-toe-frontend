@@ -40,6 +40,12 @@ export namespace tictactoe {
 
         /** GameState p2TimeUsed */
         p2TimeUsed?: (number|Long|null);
+
+        /** GameState p1DisconnectTime */
+        p1DisconnectTime?: (number|Long|null);
+
+        /** GameState p2DisconnectTime */
+        p2DisconnectTime?: (number|Long|null);
     }
 
     /** Represents a GameState. */
@@ -77,6 +83,12 @@ export namespace tictactoe {
 
         /** GameState p2TimeUsed. */
         public p2TimeUsed: (number|Long);
+
+        /** GameState p1DisconnectTime. */
+        public p1DisconnectTime: (number|Long);
+
+        /** GameState p2DisconnectTime. */
+        public p2DisconnectTime: (number|Long);
 
         /**
          * Creates a new GameState instance using the specified properties.

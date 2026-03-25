@@ -19,7 +19,7 @@ export class NakamaService {
   public myTrophies = signal<number>(0);
   private matchId: string | null = null;
   private matchmakerTicket: string | null = null;
-  
+  public activeMatchId: string | null = null;
   private gameStateSubject = new BehaviorSubject<GameState | null>(null);
   public gameState$: Observable<GameState | null> = this.gameStateSubject.asObservable();
 
@@ -68,10 +68,66 @@ export class NakamaService {
       return [];
     }
   }
+async restoreSession(): Promise<boolean> {
+    const token = localStorage.getItem('nakama_token');
+    const refreshToken = localStorage.getItem('nakama_refresh_token'); 
+    
+    if (!token) return false;
 
+    try {
+      // THE FIX: Pass both the token and the refresh token
+      this.session = Session.restore(token, refreshToken || '');
+      
+      // Check if expired
+      if (this.session.isexpired(Math.floor(Date.now() / 1000))) {
+        localStorage.removeItem('nakama_token');
+        localStorage.removeItem('nakama_refresh_token'); // NEW
+        return false;
+      }
+
+      // Reconnect Socket
+      this.socket = this.client.createSocket();
+      await this.socket.connect(this.session, true);
+      this.setupListeners();
+      await this.joinGlobalChannel();
+      this.fetchMyTrophies();
+
+      // DID WE REFRESH DURING A MATCH?
+      const savedMatchId = localStorage.getItem('active_match_id');
+      if (savedMatchId) {
+        await this.rejoinMatch(savedMatchId);
+      }
+
+      return true;
+    } catch (err) {
+      localStorage.removeItem('nakama_token');
+      localStorage.removeItem('nakama_refresh_token'); // NEW
+      return false;
+    }
+  }
+
+  // 2. Helper to reconnect to an orphaned match
+  async rejoinMatch(matchId: string) {
+    try {
+      const match = await this.socket.joinMatch(matchId);
+      this.zone.run(() => {
+        this.matchId = match.match_id;
+        this.activeMatchId = match.match_id;
+        this.matchStatus.set('ACTIVE');
+        this.startPingHeartbeat();
+        this.router.navigate(['/play']); // Force them to the board!
+      });
+    } catch (err) {
+      // Match already ended on server, clear it
+      localStorage.removeItem('active_match_id');
+      this.activeMatchId = null;
+    }
+  }
   async login(email: string, password: string): Promise<{ success: boolean, message?: string }> {
     try {
       this.session = await this.client.authenticateEmail(email, password, false);
+      localStorage.setItem('nakama_token', this.session.token); 
+      localStorage.setItem('nakama_refresh_token', this.session.refresh_token); 
       this.socket = this.client.createSocket();
       await this.socket.connect(this.session, true);
       this.setupListeners();
@@ -88,6 +144,8 @@ export class NakamaService {
     try {
       this.session = await this.client.authenticateEmail(email, password, true, username);
       await this.client.updateAccount(this.session, { display_name: `${firstName} ${lastName}` });
+      localStorage.setItem('nakama_token', this.session.token); 
+      localStorage.setItem('nakama_refresh_token', this.session.refresh_token);
       this.socket = this.client.createSocket();
       await this.socket.connect(this.session, true);
       this.setupListeners();
@@ -166,6 +224,7 @@ export class NakamaService {
     try {
       // This might throw an error if the server already destroyed the match instance
       await this.socket.leaveMatch(this.matchId);
+      localStorage.removeItem('active_match_id');
     } catch (err) {
       console.warn('Match already closed on server.');
     } finally {
@@ -173,6 +232,7 @@ export class NakamaService {
       this.matchStatus.set('LOGIN');
       if (this.pingInterval) clearInterval(this.pingInterval);
       this.gameStateSubject.next(null); 
+      localStorage.removeItem('active_match_id');
     }
   }
 
@@ -187,6 +247,10 @@ export class NakamaService {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.queuePingInterval) clearInterval(this.queuePingInterval);
     this.gameStateSubject.next(null);
+    
+    localStorage.removeItem('nakama_token');
+    localStorage.removeItem('nakama_refresh_token');
+    localStorage.removeItem('active_match_id');
   }
 
 private setupListeners() {
@@ -212,6 +276,7 @@ private setupListeners() {
       
       this.zone.run(() => {
         this.matchId = match.match_id;
+        localStorage.setItem('active_match_id', match.match_id);
         this.matchStatus.set('ACTIVE');
         this.startPingHeartbeat();
       });

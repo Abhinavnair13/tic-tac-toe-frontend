@@ -59,6 +59,19 @@
       </div>
     </div>
   </div>
+  <div class="game-over-overlay" *ngIf="opponentDisconnectTime() > 0 && !getWinner()">
+    <div class="game-over-card" style="border: 2px solid #fbbf24;">
+      <div class="result-icon">⚠️</div>
+      <h2 style="color: #fbbf24; margin-bottom: 8px;">Opponent Disconnected</h2>
+      <p style="color: #a0a0a0;">Waiting for them to reconnect...</p>
+      
+      <div class="timer" style="font-size: 3rem; margin: 24px 0;">
+        {{ opponentReconnectCountdown() }}s
+      </div>
+      
+      <p style="font-size: 0.85rem; color: #666;">If they do not return, you will win the match.</p>
+    </div>
+  </div>
 
   <div class="game-over-overlay" *ngIf="showGameOverModal() && getWinner() && !showForfeitModal()">
     <div class="game-over-card">
