@@ -1,34 +1,44 @@
-<div class="leaderboard-wrapper">
-  
-  <div class="header">
-    <h2>Global Trophies</h2>
-    <p>Top players around the world</p>
-  </div>
-
-  <div class="list-container" *ngIf="!isLoading()">
-    <div *ngIf="records().length === 0" class="empty-state">
-      <p>No records found yet.</p>
+<div class="leaderboard-content" *ngIf="!isLoading() && leaderboardRecords().length > 0">
+    <div class="table-header">
+        <span class="h-rank">#</span>
+        <span class="h-user">Player</span>
+        <span class="h-stat wins">
+          <span class="hide-mobile">Wins</span><span class="show-mobile">W</span>
+        </span>
+        <span class="h-stat">
+          <span class="hide-mobile">Losses</span><span class="show-mobile">L</span>
+        </span>
+        <span class="h-stat streak">
+          <span class="hide-mobile">Streak</span><span class="show-mobile">🔥</span>
+        </span>
+        <span class="h-stat trophy">
+          <span class="hide-mobile">Trophies</span><span class="show-mobile">🏆</span>
+        </span>
     </div>
 
-    <div 
-      *ngFor="let record of records()" 
-      class="record-row"
-      [class.gold]="record.rank === 1"
-      [class.silver]="record.rank === 2"
-      [class.bronze]="record.rank === 3"
-    >
-      <div class="rank">#{{ record.rank }}</div>
-      <div class="username">{{ record.username }}</div>
-      <div class="score">{{ record.score }} 🏆</div>
+    <div class="list-container">
+        <div *ngFor="let record of leaderboardRecords(); let i = index" 
+             class="leaderboard-row" 
+             [ngClass]="getRankClass(record.rank)"
+             [class.is-me]="record.user_id === nakamaService.myUserId">
+          
+          <div class="r-rank">{{ record.rank }}</div>
+          
+          <div class="r-user">
+             <div class="row-avatar" *ngIf="record.rank > 3">{{ getInitials(record.username) }}</div>
+             <div class="medal-icon" *ngIf="record.rank === 1">🥇</div>
+             <div class="medal-icon" *ngIf="record.rank === 2">🥈</div>
+             <div class="medal-icon" *ngIf="record.rank === 3">🥉</div>
+             <span class="u-name">{{ record.username }}</span> 
+          </div>
+          
+          <div class="r-stat wins win-color">{{ record.stats?.wins || 0 }}</div>
+          <div class="r-stat losses lose-color">{{ record.stats?.losses || 0 }}</div>
+          <div class="r-stat streak" [class.fire-color]="record.stats?.streak >= 3">
+             <span class="hide-mobile" *ngIf="record.stats?.streak >= 3">🔥 </span>
+             {{ record.stats?.streak || 0 }}
+          </div>
+          <div class="r-stat trophies gold-glow">{{ record.trophies || record.score }}</div>
+        </div>
     </div>
   </div>
-
-  <div class="spinner-container" *ngIf="isLoading()">
-    <div class="spinner"></div>
-  </div>
-
-  <div class="bottom-actions">
-    <button class="btn-primary" (click)="goToHome()">Back to Home</button>
-  </div>
-
-</div>

@@ -46,6 +46,9 @@ export const tictactoe = $root.tictactoe = (() => {
          * @property {string|null} [winnerId] GameState winnerId
          * @property {string|null} [p1Id] GameState p1Id
          * @property {string|null} [p2Id] GameState p2Id
+         * @property {boolean|null} [isTimedMode] GameState isTimedMode
+         * @property {number|Long|null} [p1TimeUsed] GameState p1TimeUsed
+         * @property {number|Long|null} [p2TimeUsed] GameState p2TimeUsed
          */
 
         /**
@@ -113,6 +116,30 @@ export const tictactoe = $root.tictactoe = (() => {
         GameState.prototype.p2Id = "";
 
         /**
+         * GameState isTimedMode.
+         * @member {boolean} isTimedMode
+         * @memberof tictactoe.GameState
+         * @instance
+         */
+        GameState.prototype.isTimedMode = false;
+
+        /**
+         * GameState p1TimeUsed.
+         * @member {number|Long} p1TimeUsed
+         * @memberof tictactoe.GameState
+         * @instance
+         */
+        GameState.prototype.p1TimeUsed = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * GameState p2TimeUsed.
+         * @member {number|Long} p2TimeUsed
+         * @memberof tictactoe.GameState
+         * @instance
+         */
+        GameState.prototype.p2TimeUsed = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
          * Creates a new GameState instance using the specified properties.
          * @function create
          * @memberof tictactoe.GameState
@@ -152,6 +179,12 @@ export const tictactoe = $root.tictactoe = (() => {
                 writer.uint32(/* id 5, wireType 2 =*/42).string(message.p1Id);
             if (message.p2Id != null && Object.hasOwnProperty.call(message, "p2Id"))
                 writer.uint32(/* id 6, wireType 2 =*/50).string(message.p2Id);
+            if (message.isTimedMode != null && Object.hasOwnProperty.call(message, "isTimedMode"))
+                writer.uint32(/* id 7, wireType 0 =*/56).bool(message.isTimedMode);
+            if (message.p1TimeUsed != null && Object.hasOwnProperty.call(message, "p1TimeUsed"))
+                writer.uint32(/* id 8, wireType 0 =*/64).int64(message.p1TimeUsed);
+            if (message.p2TimeUsed != null && Object.hasOwnProperty.call(message, "p2TimeUsed"))
+                writer.uint32(/* id 9, wireType 0 =*/72).int64(message.p2TimeUsed);
             return writer;
         };
 
@@ -219,6 +252,18 @@ export const tictactoe = $root.tictactoe = (() => {
                         message.p2Id = reader.string();
                         break;
                     }
+                case 7: {
+                        message.isTimedMode = reader.bool();
+                        break;
+                    }
+                case 8: {
+                        message.p1TimeUsed = reader.int64();
+                        break;
+                    }
+                case 9: {
+                        message.p2TimeUsed = reader.int64();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7);
                     break;
@@ -276,6 +321,15 @@ export const tictactoe = $root.tictactoe = (() => {
             if (message.p2Id != null && message.hasOwnProperty("p2Id"))
                 if (!$util.isString(message.p2Id))
                     return "p2Id: string expected";
+            if (message.isTimedMode != null && message.hasOwnProperty("isTimedMode"))
+                if (typeof message.isTimedMode !== "boolean")
+                    return "isTimedMode: boolean expected";
+            if (message.p1TimeUsed != null && message.hasOwnProperty("p1TimeUsed"))
+                if (!$util.isInteger(message.p1TimeUsed) && !(message.p1TimeUsed && $util.isInteger(message.p1TimeUsed.low) && $util.isInteger(message.p1TimeUsed.high)))
+                    return "p1TimeUsed: integer|Long expected";
+            if (message.p2TimeUsed != null && message.hasOwnProperty("p2TimeUsed"))
+                if (!$util.isInteger(message.p2TimeUsed) && !(message.p2TimeUsed && $util.isInteger(message.p2TimeUsed.low) && $util.isInteger(message.p2TimeUsed.high)))
+                    return "p2TimeUsed: integer|Long expected";
             return null;
         };
 
@@ -315,6 +369,26 @@ export const tictactoe = $root.tictactoe = (() => {
                 message.p1Id = String(object.p1Id);
             if (object.p2Id != null)
                 message.p2Id = String(object.p2Id);
+            if (object.isTimedMode != null)
+                message.isTimedMode = Boolean(object.isTimedMode);
+            if (object.p1TimeUsed != null)
+                if ($util.Long)
+                    (message.p1TimeUsed = $util.Long.fromValue(object.p1TimeUsed)).unsigned = false;
+                else if (typeof object.p1TimeUsed === "string")
+                    message.p1TimeUsed = parseInt(object.p1TimeUsed, 10);
+                else if (typeof object.p1TimeUsed === "number")
+                    message.p1TimeUsed = object.p1TimeUsed;
+                else if (typeof object.p1TimeUsed === "object")
+                    message.p1TimeUsed = new $util.LongBits(object.p1TimeUsed.low >>> 0, object.p1TimeUsed.high >>> 0).toNumber();
+            if (object.p2TimeUsed != null)
+                if ($util.Long)
+                    (message.p2TimeUsed = $util.Long.fromValue(object.p2TimeUsed)).unsigned = false;
+                else if (typeof object.p2TimeUsed === "string")
+                    message.p2TimeUsed = parseInt(object.p2TimeUsed, 10);
+                else if (typeof object.p2TimeUsed === "number")
+                    message.p2TimeUsed = object.p2TimeUsed;
+                else if (typeof object.p2TimeUsed === "object")
+                    message.p2TimeUsed = new $util.LongBits(object.p2TimeUsed.low >>> 0, object.p2TimeUsed.high >>> 0).toNumber();
             return message;
         };
 
@@ -343,6 +417,17 @@ export const tictactoe = $root.tictactoe = (() => {
                 object.winnerId = "";
                 object.p1Id = "";
                 object.p2Id = "";
+                object.isTimedMode = false;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.p1TimeUsed = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.p1TimeUsed = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.p2TimeUsed = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.p2TimeUsed = options.longs === String ? "0" : 0;
             }
             if (message.board && message.board.length) {
                 object.board = [];
@@ -362,6 +447,18 @@ export const tictactoe = $root.tictactoe = (() => {
                 object.p1Id = message.p1Id;
             if (message.p2Id != null && message.hasOwnProperty("p2Id"))
                 object.p2Id = message.p2Id;
+            if (message.isTimedMode != null && message.hasOwnProperty("isTimedMode"))
+                object.isTimedMode = message.isTimedMode;
+            if (message.p1TimeUsed != null && message.hasOwnProperty("p1TimeUsed"))
+                if (typeof message.p1TimeUsed === "number")
+                    object.p1TimeUsed = options.longs === String ? String(message.p1TimeUsed) : message.p1TimeUsed;
+                else
+                    object.p1TimeUsed = options.longs === String ? $util.Long.prototype.toString.call(message.p1TimeUsed) : options.longs === Number ? new $util.LongBits(message.p1TimeUsed.low >>> 0, message.p1TimeUsed.high >>> 0).toNumber() : message.p1TimeUsed;
+            if (message.p2TimeUsed != null && message.hasOwnProperty("p2TimeUsed"))
+                if (typeof message.p2TimeUsed === "number")
+                    object.p2TimeUsed = options.longs === String ? String(message.p2TimeUsed) : message.p2TimeUsed;
+                else
+                    object.p2TimeUsed = options.longs === String ? $util.Long.prototype.toString.call(message.p2TimeUsed) : options.longs === Number ? new $util.LongBits(message.p2TimeUsed.low >>> 0, message.p2TimeUsed.high >>> 0).toNumber() : message.p2TimeUsed;
             return object;
         };
 

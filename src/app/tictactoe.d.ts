@@ -31,6 +31,15 @@ export namespace tictactoe {
 
         /** GameState p2Id */
         p2Id?: (string|null);
+
+        /** GameState isTimedMode */
+        isTimedMode?: (boolean|null);
+
+        /** GameState p1TimeUsed */
+        p1TimeUsed?: (number|Long|null);
+
+        /** GameState p2TimeUsed */
+        p2TimeUsed?: (number|Long|null);
     }
 
     /** Represents a GameState. */
@@ -59,6 +68,15 @@ export namespace tictactoe {
 
         /** GameState p2Id. */
         public p2Id: string;
+
+        /** GameState isTimedMode. */
+        public isTimedMode: boolean;
+
+        /** GameState p1TimeUsed. */
+        public p1TimeUsed: (number|Long);
+
+        /** GameState p2TimeUsed. */
+        public p2TimeUsed: (number|Long);
 
         /**
          * Creates a new GameState instance using the specified properties.

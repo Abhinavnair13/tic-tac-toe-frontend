@@ -1,146 +1,360 @@
 .leaderboard-wrapper {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 60px); /* 60px for global app header */
-  background-color: #121212;
+  width: 100%;
+  min-height: calc(100vh - 60px);
+  position: relative;
+  box-sizing: border-box;
 }
 
-.header {
-  padding: 24px 20px 12px;
+/* --- STICKY MY RANK HEADER --- */
+.my-rank-header {
+  position: fixed;
+  top: 60px;
+  /* Right under the global app header */
+  left: 0;
+  right: 0;
+  height: 70px;
+  background-color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  z-index: 90;
+  border-bottom: 2px solid #333;
+}
+
+.my-rank-header .rank-col {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  width: 60px;
   text-align: center;
 }
 
-.header h2 {
-  margin: 0 0 8px;
-  font-size: 1.8rem;
-  color: #ffffff;
-}
-
-.header p {
-  margin: 0;
-  color: #a0a0a0;
-  font-size: 0.95rem;
-}
-
-.list-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.record-row {
+.my-rank-header .user-col {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  background-color: #1e1e1e;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
-}
-
-.record-row:active {
-  transform: scale(0.98);
-}
-
-.rank {
-  font-weight: bold;
-  font-size: 1.2rem;
-  width: 40px;
-  color: #a0a0a0;
-}
-
-.username {
+  gap: 12px;
   flex: 1;
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-left: 12px;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.score {
-  font-weight: bold;
-  color: #4db8ff;
-  font-size: 1.1rem;
-  min-width: 60px;
-  text-align: right;
-}
-
-/* Podium Colors */
-.record-row.gold {
-  background: linear-gradient(135deg, #ffd70033, #1e1e1e);
-  border: 1px solid rgba(255, 215, 0, 0.4);
-}
-.record-row.gold .rank { color: #ffd700; }
-.record-row.gold .username { color: #ffd700; }
-
-.record-row.silver {
-  background: linear-gradient(135deg, #c0c0c033, #1e1e1e);
-  border: 1px solid rgba(192, 192, 192, 0.4);
-}
-.record-row.silver .rank { color: #c0c0c0; }
-.record-row.silver .username { color: #c0c0c0; }
-
-.record-row.bronze {
-  background: linear-gradient(135deg, #cd7f3233, #1e1e1e);
-  border: 1px solid rgba(205, 127, 50, 0.4);
-}
-.record-row.bronze .rank { color: #cd7f32; }
-.record-row.bronze .username { color: #cd7f32; }
-
-/* Fixed Bottom Action */
-.bottom-actions {
-  padding: 20px;
-  background-color: rgba(18, 18, 18, 0.95);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid #333;
-}
-
-.btn-primary {
-  width: 100%;
-  height: 48px;
-  border-radius: 8px;
-  border: none;
-  background-color: #2a2a2a;
-  color: #ffffff;
-  font-size: 1.1rem;
+  color: #fff;
   font-weight: 600;
-  cursor: pointer;
 }
 
-.btn-primary:active {
+.header-avatar {
+  width: 40px;
+  height: 40px;
   background-color: #333;
-}
-
-.spinner-container {
-  flex: 1;
+  border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
+  font-weight: bold;
+  color: #a0a0a0;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #1e1e1e;
-  border-top: 4px solid #4db8ff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.my-rank-header .stat-col {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-left: 20px;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.my-rank-header .trophies {
+  color: #fbd38d;
 }
 
-.empty-state {
+/* --- LEADERBOARD CONTENT --- */
+.leaderboard-content {
+  margin-top: 70px;
+  /* Push content down past the sticky header */
+  width: 100%;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* --- TABLE HEADER STYLING --- */
+.table-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  color: #888;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.h-rank {
+  width: 60px;
+  text-align: center;
+}
+
+.h-user {
+  flex: 1;
+}
+
+.h-stat {
+  width: 70px;
+  text-align: center;
+}
+
+/* --- ROW STYLING --- */
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  transition: background-color 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.leaderboard-row:hover {
+  background-color: #222;
+}
+
+
+.r-rank {
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 60px;
   text-align: center;
   color: #a0a0a0;
-  padding: 40px 0;
+}
+
+.r-user {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.r-stat {
+  width: 70px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.95rem tabular-nums;
+}
+
+.row-avatar {
+  width: 32px;
+  height: 32px;
+  background-color: #2a2a2a;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #888;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.medal-icon {
+  font-size: 1.4rem;
+}
+
+/* --- RANK STYLING --- */
+
+/* #1 GOLD */
+.rank-1 {
+  background: linear-gradient(135deg, #1e1e1e, #332b13) !important;
+  box-shadow: 0 0 15px rgba(251, 211, 141, 0.2) !important;
+  border: 1px solid rgba(251, 211, 141, 0.3);
+}
+
+.rank-1 .r-rank {
+  color: #fbd38d;
+  font-size: 1.3rem;
+}
+
+.rank-1 .r-user {
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+
+/* #2 SILVER */
+.rank-2 {
+  background: linear-gradient(135deg, #1e1e1e, #2a2a2a) !important;
+  box-shadow: 0 0 10px rgba(160, 160, 160, 0.1) !important;
+  border: 1px solid rgba(160, 160, 160, 0.2);
+}
+
+.rank-2 .r-rank {
+  color: #d0d0d0;
+}
+
+/* #3 BRONZE */
+.rank-3 {
+  background: linear-gradient(135deg, #1e1e1e, #302015) !important;
+  border: 1px solid rgba(184, 115, 51, 0.2);
+}
+
+.rank-3 .r-rank {
+  color: #b87333;
+}
+
+/* Global helper colors */
+.win-color {
+  color: #4ade80;
+}
+
+.lose-color {
+  color: #ff5e5e;
+}
+
+.fire-color {
+  color: #f97316;
+}
+
+.gold-glow {
+  color: #fbd38d;
+  text-shadow: 0 0 8px rgba(251, 211, 141, 0.5);
+}
+
+
+/* --- NO RECORDS FOUND STATE --- */
+.no-records-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background-color: #1a1a1a;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-top: 20px;
+  animation: popIn 0.3s ease-out;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+  filter: grayscale(100%);
+}
+
+.no-records-card h3 {
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+}
+
+.no-records-card p {
+  color: #a0a0a0;
+  margin: 0;
+  font-size: 1rem;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- TRUNCATION HELPERS --- */
+.show-mobile {
+  display: none;
+}
+
+.u-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* --- MOBILE RESPONSIVENESS (DATA-DENSE) --- */
+@media (max-width: 600px) {
+
+  /* Swap header text for icons/letters */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .show-mobile {
+    display: inline !important;
+    font-size: 0.95rem;
+  }
+
+  /* Tighten Container */
+  .leaderboard-content {
+    padding: 10px 4px;
+  }
+
+  .leaderboard-row {
+    padding: 10px 6px;
+    gap: 4px;
+  }
+
+  .table-header {
+    padding: 8px 6px;
+    gap: 4px;
+    font-size: 0.75rem;
+  }
+
+  /* Shrink Rank */
+  .h-rank,
+  .r-rank {
+    width: 25px;
+    font-size: 0.9rem;
+    text-align: left;
+  }
+
+  /* Flex User Column - min-width: 0 is required for flexbox truncation! */
+  .h-user,
+  .r-user {
+    flex: 1;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .u-name {
+    font-size: 0.85rem;
+  }
+
+  /* Hide the grey avatar to save 32px of space, keep medals */
+  .row-avatar {
+    display: none;
+  }
+
+  .medal-icon {
+    font-size: 1.1rem;
+  }
+
+  /* Compress Stats Columns */
+  .h-stat,
+  .r-stat {
+    width: 35px;
+    font-size: 0.85rem;
+  }
+
+  /* Give slightly more room to Trophies since numbers get larger */
+  .h-stat.trophy,
+  .r-stat.trophies {
+    width: 50px;
+    font-size: 0.9rem;
+  }
 }

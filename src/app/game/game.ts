@@ -14,16 +14,20 @@ import { NakamaService } from '../services/nakama.service';
 export class Game implements OnInit, OnDestroy {
   private router = inject(Router);
   public nakamaService = inject(NakamaService);
-
+  opponentName = signal<string | null>(null);
+  private fetchedUsers = false;
   matchStatus = this.nakamaService.matchStatus;
   ping = this.nakamaService.ping;
-  
+  showGameOverModal = signal<boolean>(false);
+  winningClass = signal<string | null>(null);
   gameState = signal<any>(null); // From NakamaService Protobuf state
   timeLeft = signal<number>(30);
   showForfeitModal = signal<boolean>(false);
   
   private timerInterval: any;
   private sub!: Subscription;
+
+
 
   ngOnInit() {
     if (!this.nakamaService.hasSession()) {
@@ -32,30 +36,115 @@ export class Game implements OnInit, OnDestroy {
     }
 
     this.sub = this.nakamaService.gameState$.subscribe(state => {
+      const oldState = this.gameState();
       this.gameState.set(state);
       this.updateTimer();
+      
+      if (!state) return;
+      const p1 = state.p1Id || state.p1_id;
+      const p2 = state.p2Id || state.p2_id;
+      if (p1 && p2 && !this.fetchedUsers) {
+        this.fetchedUsers = true;
+        this.resolveUsernames(p1, p2);
+      }
+
+      // Check if the game JUST finished on this exact tick
+      const winnerNow = this.extractWinner(state);
+      const winnerBefore = this.extractWinner(oldState);
+
+      if (winnerNow && !winnerBefore) {
+        const board = state.board || [0,0,0,0,0,0,0,0,0];
+        const wLine = this.getWinningLineClass(board);
+        
+        if (wLine) {
+          // It's a normal win: Show the line and wait 3 seconds
+          this.winningClass.set(wLine);
+          setTimeout(() => {
+            this.showGameOverModal.set(true);
+          }, 2000);
+        } else {
+          // It's a Forfeit or Draw: Show modal immediately
+          this.showGameOverModal.set(true);
+        }
+      } else if (!winnerNow) {
+        this.showGameOverModal.set(false);
+        this.winningClass.set(null);
+      }
     });
     
     this.timerInterval = setInterval(() => {
       this.updateTimer();
     }, 1000);
 
-    // Join matchmaking on entry
     this.nakamaService.joinMatchmaking();
   }
+  updateTimer() {
+    if (!this.isTimedMode()) {
+      return;
+    }
 
- updateTimer() {
     const state = this.gameState();
-    if (state && state.turnStartTime) {
-      const nowRaw = Math.floor(Date.now() / 1000);
-      const turnStart = Number(state.turnStartTime);
-      const diff = 30 - (nowRaw - turnStart);
-      this.timeLeft.set(Math.max(0, diff));
+    if (state && (state.turnStartTime || state.turn_start_time)) {
+      const turnStartTime = Number(state.turnStartTime || state.turn_start_time);
+      const now = Math.floor(Date.now() / 1000);
+      const elapsed = now - turnStartTime;
+      const remaining = Math.max(0, 30 - elapsed);
+      this.timeLeft.set(remaining);
     } else {
       this.timeLeft.set(30);
     }
   }
+  isTimedMode(): boolean {
+    const s = this.gameState(); 
+    
+    // If the server explicitly sent the mode, use it
+    if (s && s.isTimedMode !== undefined) return s.isTimedMode;
+    if (s && s.is_timed_mode !== undefined) return s.is_timed_mode;
+    
+    // THE FIX: Fallback to whatever button the user clicked on the home screen
+    return this.nakamaService.selectedMode === 'timed';
+  }
+  p1TimeUsed(): number {
+    const s = this.gameState(); 
+    return s ? Number(s.p1TimeUsed || s.p1_time_used || 0) : 0;
+  }
 
+  p2TimeUsed(): number {
+    const s = this.gameState(); 
+    return s ? Number(s.p2TimeUsed || s.p2_time_used || 0) : 0;
+  }
+
+  getEarnedTrophies(): number {
+    if (this.isTimedMode()) return 10;
+    
+    const p1 = this.p1Id();
+    const myTime = this.myUserId === p1 ? this.p1TimeUsed() : this.p2TimeUsed();
+    
+    if (myTime <= 120) return 10;
+    if (myTime <= 180) return 9;
+    if (myTime <= 240) return 8;
+    return 7;
+  }
+  extractWinner(state: any): string | null {
+    if (!state) return null;
+    
+    const winner = state.winnerId || state.winner_id;
+    if (winner) return winner;
+
+    const board = state.board || [0,0,0,0,0,0,0,0,0];
+    const isFull = board.every((cell: number) => cell !== 0);
+    if (isFull) return 'DRAW';
+
+    return null;
+  }
+  async resolveUsernames(p1: string, p2: string) {
+    const opponentId = (p1 === this.myUserId) ? p2 : p1;
+    const users = await this.nakamaService.getUsers([opponentId]);
+    
+    if (users.length > 0 && users[0].username) {
+      this.opponentName.set(users[0].username);
+    }
+  }
   
   get myUserId(): string | null {
     return this.nakamaService.myUserId;
@@ -75,41 +164,26 @@ export class Game implements OnInit, OnDestroy {
 
   makeMove(index: number) {
     const state = this.gameState();
-    console.log("--- Clicked Cell ---", index);
-    
     if (!state) return;
     
-    // 1. Turn Validation
-    if (!this.isMyTurn()) {
-       console.warn("Ignored: It is not your turn!");
-       return;
-    }
+    if (!this.isMyTurn()) return;
 
     const board = state.board || [0,0,0,0,0,0,0,0,0];
-    if (board[index] !== 0) {
-       console.warn("Ignored: This cell is already played!");
-       return;
-    }
+    if (board[index] !== 0) return;
 
-    // 3. Game Over Validation
-    if (state.winnerId || state.winner_id) {
-       console.warn("Ignored: The game is already over!");
-       return;
-    }
+    // THE FIX: Use getWinner() so it blocks moves if the game is a DRAW
+    if (this.getWinner()) return;
 
-    console.log("All checks passed! Sending move to Nakama...");
     this.nakamaService.sendMove(index);
   }
   // Safe getter for the winner ID (handles Protobuf JS formatting)
   getWinner(): string | null {
-    const state = this.gameState();
-    if (!state) return null;
-    // pbjs might convert it to camelCase or keep snake_case
-    return state.winnerId || state.winner_id || null; 
+    return this.extractWinner(this.gameState()); 
   }
 
   goToHome() {
     this.nakamaService.fetchMyTrophies(); // Refresh trophies after match ends!
+    this.nakamaService.leaveMatch();
     this.router.navigate(['/home']);
   }
 
@@ -156,5 +230,49 @@ export class Game implements OnInit, OnDestroy {
       }
     }
     return false; 
+  }
+
+  p1Id(): string | null {
+    const s = this.gameState(); return s ? (s.p1Id || s.p1_id) : null;
+  }
+  
+  p2Id(): string | null {
+    const s = this.gameState(); return s ? (s.p2Id || s.p2_id) : null;
+  }
+
+  isXTurn(): boolean {
+    const s = this.gameState(); return s ? (s.currentTurn === 1 || s.current_turn === 1) : false;
+  }
+
+  isOTurn(): boolean {
+    const s = this.gameState(); return s ? (s.currentTurn === 2 || s.current_turn === 2) : false;
+  }
+
+  getPlayerName(id: string | null): string {
+    if (!id) return '...';
+    if (id === this.myUserId) return '(You)';
+    
+    return this.opponentName() || 'Opponent'; 
+  }
+
+  // --- NEW HELPER TO FIND THE WINNING LINE ---
+  getWinningLineClass(board: number[]): string | null {
+    const lines = [
+      { indices: [0, 1, 2], class: 'strike-row-1' },
+      { indices: [3, 4, 5], class: 'strike-row-2' },
+      { indices: [6, 7, 8], class: 'strike-row-3' },
+      { indices: [0, 3, 6], class: 'strike-col-1' },
+      { indices: [1, 4, 7], class: 'strike-col-2' },
+      { indices: [2, 5, 8], class: 'strike-col-3' },
+      { indices: [0, 4, 8], class: 'strike-diag-1' },
+      { indices: [2, 4, 6], class: 'strike-diag-2' }
+    ];
+    for (const line of lines) {
+      const [a, b, c] = line.indices;
+      if (board[a] !== 0 && board[a] === board[b] && board[a] === board[c]) {
+        return line.class;
+      }
+    }
+    return null;
   }
 }

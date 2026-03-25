@@ -1,24 +1,33 @@
 <div class="home-wrapper">
-  <div class="profile-header">
-    <div class="avatar">
-      {{ username().charAt(0).toUpperCase() }}
+  <div class="welcome-card">
+    
+    <h2>Welcome, {{ nakamaService.myUsername || 'Player' }}!</h2>
+    <p>Select a game mode to start playing.</p>
+
+    <div class="action-buttons">
+      
+      <button class="btn-mode classic" (click)="playNow('untimed')">
+        <div class="mode-icon">♾️</div>
+        <div class="mode-text">
+          <h3>Play Classic</h3>
+          <span>No turn timers. Think deep!</span>
+        </div>
+      </button>
+
+      <button class="btn-mode timed" (click)="playNow('timed')">
+        <div class="mode-icon">⚡</div>
+        <div class="mode-text">
+          <h3>Play Timed</h3>
+          <span>30s per turn. Fast paced!</span>
+        </div>
+      </button>
+
     </div>
-    <h2>Welcome, {{ username() }}!</h2>
-  </div>
 
-  <div class="nav-buttons">
-    <button class="nav-btn play-btn" (click)="playNow()">
-      Play Now
-    </button>
-    <button class="nav-btn" (click)="goToLeaderboard()">
-      Leaderboards
-    </button>
-    <button class="nav-btn profile-btn" (click)="goToProfile()">
-      Profile
-    </button>
-  </div>
+    <div class="secondary-actions">
+      <button class="btn-secondary" (click)="goToProfile()">👤 Profile</button>
+      <button class="btn-secondary" (click)="goToLeaderboard()">🏆 Leaderboard</button>
+    </div>
 
-  <div class="online-indicator">
-    <div class="neon-dot"></div>Players Online : {{ nakamaService.onlinePlayers() }} 
   </div>
 </div>

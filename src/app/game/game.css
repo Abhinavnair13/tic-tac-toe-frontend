@@ -68,20 +68,6 @@
   margin-bottom: 24px;
 }
 
-.turn-indicator {
-  padding: 8px 16px;
-  background-color: #1e1e1e;
-  border-radius: 8px;
-  font-weight: bold;
-  font-size: 1.1rem;
-  transition: all 0.3s ease;
-}
-
-.turn-indicator.my-turn {
-  background-color: #4db8ff;
-  color: #121212;
-}
-
 .timer {
   font-size: 1.5rem;
   font-weight: bold;
@@ -102,22 +88,6 @@
   to {
     opacity: 0.5;
   }
-}
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  /* NEW: Force equal height rows */
-  gap: 12px;
-  width: 90vw;
-  max-width: 400px;
-  aspect-ratio: 1 / 1;
-  background-color: #1e1e1e;
-  padding: 12px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  touch-action: manipulation;
 }
 
 .cell {
@@ -149,12 +119,10 @@
 
 .mark.p1 {
   color: #4db8ff;
-  /* X color */
 }
 
 .mark.p2 {
   color: #ff5e5e;
-  /* O color */
 }
 
 .game-over-overlay {
@@ -169,6 +137,16 @@
   align-items: center;
   z-index: 100;
   backdrop-filter: blur(4px);
+}
+
+.p1,
+.player-name.p1 {
+  color: #4db8ff;
+}
+
+.p2,
+.player-name.p2 {
+  color: #ff5e5e;
 }
 
 .game-over-card {
@@ -244,7 +222,6 @@
   color: #121212;
 }
 
-/* Ping Indicator */
 .ping-indicator {
   position: fixed;
   bottom: 16px;
@@ -279,4 +256,198 @@
 .ping-dot.bad {
   background-color: #f87171;
   box-shadow: 0 0 5px #f87171;
+}
+
+
+/* --- NEW UI HEADER & HIGHLIGHTS --- */
+.players-vs-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #1a1a1a;
+  padding: 8px 24px;
+  border-radius: 12px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0.4;
+  transform: scale(0.9);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.player-info.active-x {
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(77, 184, 255, 0.5));
+}
+
+.player-info.active-o {
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(255, 94, 94, 0.5));
+}
+
+.player-mark {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.player-name {
+  font-size: 0.75rem;
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+.vs-text {
+  font-weight: 900;
+  color: #444;
+  font-size: 1rem;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 12px;
+  width: 90vw;
+  max-width: 400px;
+  aspect-ratio: 1 / 1;
+  background-color: #1e1e1e;
+  padding: 12px;
+  border-radius: 12px;
+  touch-action: manipulation;
+
+  /* Dynamic Borders */
+  position: relative;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  border: 3px solid transparent;
+}
+
+/* Dynamic Grid Border based on Turn */
+.board.highlight-x {
+  border-color: rgba(77, 184, 255, 0.8);
+  box-shadow: 0 0 25px rgba(77, 184, 255, 0.2);
+}
+
+.board.highlight-o {
+  border-color: rgba(255, 94, 94, 0.8);
+  box-shadow: 0 0 25px rgba(255, 94, 94, 0.2);
+}
+
+/* --- STRIKETHROUGH ANIMATIONS --- */
+.strike-line {
+  position: absolute;
+  background-color: white;
+  border-radius: 8px;
+  z-index: 10;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+}
+
+/* Rows */
+.strike-row-1 {
+  top: 15%;
+  left: 5%;
+  height: 8px;
+  animation: drawH 0.5s forwards ease-out;
+}
+
+.strike-row-2 {
+  top: 50%;
+  left: 5%;
+  height: 8px;
+  transform: translateY(-50%);
+  animation: drawH 0.5s forwards ease-out;
+}
+
+.strike-row-3 {
+  bottom: 15%;
+  left: 5%;
+  height: 8px;
+  animation: drawH 0.5s forwards ease-out;
+}
+
+@keyframes drawH {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 90%;
+  }
+}
+
+/* Columns */
+.strike-col-1 {
+  left: 15%;
+  top: 5%;
+  width: 8px;
+  animation: drawV 0.5s forwards ease-out;
+}
+
+.strike-col-2 {
+  left: 50%;
+  top: 5%;
+  width: 8px;
+  transform: translateX(-50%);
+  animation: drawV 0.5s forwards ease-out;
+}
+
+.strike-col-3 {
+  right: 15%;
+  top: 5%;
+  width: 8px;
+  animation: drawV 0.5s forwards ease-out;
+}
+
+@keyframes drawV {
+  from {
+    height: 0;
+  }
+
+  to {
+    height: 90%;
+  }
+}
+
+/* Diagonals */
+.strike-diag-1 {
+  top: 5%;
+  left: 5%;
+  height: 8px;
+  transform-origin: top left;
+  transform: rotate(45deg);
+  animation: drawD1 0.5s forwards ease-out;
+}
+
+@keyframes drawD1 {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 125%;
+  }
+}
+
+.strike-diag-2 {
+  top: 5%;
+  right: 5%;
+  height: 8px;
+  transform-origin: top right;
+  transform: rotate(-45deg);
+  animation: drawD2 0.5s forwards ease-out;
+}
+
+@keyframes drawD2 {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 125%;
+  }
 }

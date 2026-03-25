@@ -3,11 +3,13 @@ import { Auth } from './auth/auth';
 import { Home } from './home/home';
 import { Game } from './game/game';
 import { Leaderboard } from './leaderboard/leaderboard';
+import { Profile } from './profile/profile';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
   { path: 'auth', component: Auth },
   { path: 'home', component: Home },
   { path: 'play', component: Game },
-  { path: 'leaderboard', component: Leaderboard }
+  { path: 'leaderboard', component: Leaderboard },
+  { path: 'profile', component: Profile }
 ];

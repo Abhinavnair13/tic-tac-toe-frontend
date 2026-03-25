@@ -9,15 +9,30 @@
   <div class="match-container" *ngIf="matchStatus() === 'ACTIVE' && gameState()">
     
     <div class="game-header">
-      <div class="turn-indicator" [class.my-turn]="isMyTurn()">
-        {{ isMyTurn() ? "Your Turn" : "Opponent's Turn" }}
+      <div class="players-vs-container">
+        <div class="player-info" [class.active-x]="isXTurn()">
+          <span class="player-mark p1">X</span>
+          <span class="player-name p1">{{ getPlayerName(p1Id()) }}</span>
+        </div>
+        <div class="vs-text">VS</div>
+        <div class="player-info" [class.active-o]="isOTurn()">
+          <span class="player-mark p2">O</span>
+          <span class="player-name p2">{{ getPlayerName(p2Id()) }}</span>
+        </div>
       </div>
-      <div class="timer" [class.low-time]="timeLeft() <= 5">
+
+      <div class="timer" [class.low-time]="timeLeft() <= 5" *ngIf="isTimedMode()">
         {{ timeLeft() }}s
+      </div>
+      <div class="timer" *ngIf="!isTimedMode()" style="font-size: 1.1rem; color: #a0a0a0;">
+        Classic
       </div>
     </div>
 
-    <div class="board">
+    <div class="board" [class.highlight-x]="isXTurn()" [class.highlight-o]="isOTurn()">
+      
+      <div *ngIf="winningClass()" class="strike-line" [ngClass]="winningClass()"></div>
+
       <div 
         *ngFor="let cell of gameState().board; let i = index" 
         class="cell"
@@ -45,7 +60,7 @@
     </div>
   </div>
 
-  <div class="game-over-overlay" *ngIf="getWinner()">
+  <div class="game-over-overlay" *ngIf="showGameOverModal() && getWinner() && !showForfeitModal()">
     <div class="game-over-card">
       
       <div *ngIf="getWinner() === myUserId" class="result-icon">🏆</div>

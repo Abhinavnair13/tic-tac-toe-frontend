@@ -26,7 +26,9 @@ export class Home implements OnInit {
     }
   }
 
-  playNow() {
+  playNow(mode: 'timed' | 'untimed') {
+    // Save the selected mode to the service before routing
+    this.nakamaService.selectedMode = mode;
     this.router.navigate(['/play']);
   }
 

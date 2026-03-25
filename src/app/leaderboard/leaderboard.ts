@@ -12,10 +12,10 @@ import { NakamaService } from '../services/nakama.service';
 })
 export class Leaderboard implements OnInit {
   private router = inject(Router);
-  private nakamaService = inject(NakamaService);
+  public nakamaService = inject(NakamaService);
 
-  records = signal<any[]>([]);
-  isLoading = signal(true);
+  isLoading = signal<boolean>(true);
+  leaderboardRecords = signal<any[]>([]);
 
   async ngOnInit() {
     if (!this.nakamaService.hasSession()) {
@@ -23,21 +23,21 @@ export class Leaderboard implements OnInit {
       return;
     }
 
-    const leaderboardItems = await this.nakamaService.getLeaderboard();
-    if (leaderboardItems && leaderboardItems.records) {
-      // Map API records to a structured format for UI
-      this.records.set(
-        leaderboardItems.records.map((r, i) => ({
-          rank: i + 1,
-          username: r.username || 'Anonymous',
-          score: r.score
-        }))
-      );
-    }
+    // Just fetch the global Top 50 and render it directly
+    const records = await this.nakamaService.getLeaderboardWithStats();
+    this.leaderboardRecords.set(records);
     this.isLoading.set(false);
   }
 
-  goToHome() {
-    this.router.navigate(['/home']);
+  getRankClass(rank: number): string {
+    if (rank === 1) return 'rank-1';
+    if (rank === 2) return 'rank-2';
+    if (rank === 3) return 'rank-3';
+    return '';
+  }
+
+  getInitials(username: string | null): string {
+    if (!username || username === 'Anonymous') return '?';
+    return username.charAt(0).toUpperCase();
   }
 }

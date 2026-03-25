@@ -10,10 +10,10 @@ import { tictactoe } from '../tictactoe.js';
   providedIn: 'root'
 })
 export class NakamaService {
-  private client: Client;
-  private session!: Session;
+  public client: Client;
+  public session!: Session;
   private socket!: Socket;
-
+  public selectedMode: 'timed' | 'untimed' = 'timed';
   private zone = inject(NgZone);
   private router = inject(Router);
   public myTrophies = signal<number>(0);
@@ -57,6 +57,16 @@ export class NakamaService {
   }
   public hasSession(): boolean {
     return !!this.session && !this.session.isexpired(Math.floor(Date.now() / 1000));
+  }
+  async getUsers(userIds: string[]) {
+    if (!this.session) return [];
+    try {
+      const response = await this.client.getUsers(this.session, userIds);
+      return response.users || [];
+    } catch (err) {
+      console.error('Failed to fetch user profiles:', err);
+      return [];
+    }
   }
 
   async login(email: string, password: string): Promise<{ success: boolean, message?: string }> {
@@ -106,7 +116,9 @@ export class NakamaService {
       return;
     }
     this.matchStatus.set('QUEUE');
-    const matchmakerResponse = await this.socket.addMatchmaker('*', 2, 2);
+    const query = `+properties.mode:${this.selectedMode}`;
+    const stringProps = { mode: this.selectedMode };
+    const matchmakerResponse = await this.socket.addMatchmaker(query, 2, 2, stringProps);
     this.matchmakerTicket = matchmakerResponse.ticket;
 
     // Fake a ping metric while in queue using a dummy HTTP call
@@ -279,6 +291,46 @@ async sendMove(position: number) {
       this.onlinePlayers.set(existingPlayers + 1);
     } catch (err) {
       console.error('Failed to join global channel', err);
+    }
+  }
+  async getProfileData() {
+    if (!this.session) return null;
+    try {
+      // Fetch Account details (Name, Username, Email)
+      const account = await this.client.getAccount(this.session);
+      
+      // Fetch Custom Stats from the Storage Engine
+      const storage = await this.client.readStorageObjects(this.session, {
+        object_ids: [{ collection: 'stats', key: 'profile', user_id: this.myUserId }]
+      });
+
+      let stats = { wins: 0, losses: 0, streak: 0 };
+      if (storage.objects && storage.objects.length > 0) {
+        stats = storage.objects[0].value as any;
+      }
+
+      return { account, stats };
+    } catch (err) {
+      console.error('Failed to fetch profile', err);
+      return null;
+    }
+  }
+  getSession(): Session | null {
+    return this.session;
+  }
+
+  async getLeaderboardWithStats() {
+    if (!this.session) return [];
+    try {
+      const response = await this.client.rpc(this.session, 'get_leaderboard_with_stats', {});
+      
+      if (response.payload) {
+        return typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
+      }
+      return [];
+    } catch (err) {
+      console.error('Failed to fetch leaderboard rpc', err);
+      return [];
     }
   }
 }

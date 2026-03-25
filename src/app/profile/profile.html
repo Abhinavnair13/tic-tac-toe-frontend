@@ -1,0 +1,64 @@
+<div class="profile-wrapper">
+  
+  <div class="header-nav">
+    <!-- <button class="btn-icon" (click)="goBack()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      Back
+    </button> -->
+    <h2>Player Profile</h2>
+    <div style="width: 70px;"></div> </div>
+
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="profile-content" *ngIf="!isLoading() && profileData()">
+    
+    <div class="profile-card hero-card">
+      <div class="avatar">{{ initials }}</div>
+      <h3>{{ profileData().account.user.username }}</h3>
+      <p class="trophies">🏆 {{ nakamaService.myTrophies() }} Trophies</p>
+    </div>
+
+    <div class="profile-card">
+      <h4>Account Details</h4>
+      
+      <div class="info-row">
+        <span class="label">User name</span>
+        <span class="value">{{ profileData().account.user.username }}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Full Name</span>
+        <span class="value">{{ profileData().account.user.display_name }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="label">Email</span>
+        <span class="value">{{ profileData().account.email }}</span>
+      </div>
+      
+    </div>
+
+    <div class="profile-card">
+      <h4>Match Statistics</h4>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-val win-color">{{ profileData().stats.wins }}</span>
+          <span class="stat-label">Wins</span>
+        </div>
+        
+        <div class="stat-box">
+          <span class="stat-val lose-color">{{ profileData().stats.losses }}</span>
+          <span class="stat-label">Losses</span>
+        </div>
+
+        <div class="stat-box streak">
+          <span class="stat-val fire-color">🔥 {{ profileData().stats.streak }}</span>
+          <span class="stat-label">Current Streak</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
