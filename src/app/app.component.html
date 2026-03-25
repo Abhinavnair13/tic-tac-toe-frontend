@@ -32,6 +32,21 @@
   <main class="app-main">
     <router-outlet></router-outlet>
   </main>
+  <div class="modal-overlay" *ngIf="nakamaService.sessionKicked()">
+  <div class="modal-card" style="border: 2px solid #ff5e5e;">
+    <div style="font-size: 3rem; margin-bottom: 16px;">📱</div>
+    
+    <h2 style="color: #ff5e5e; margin-top: 0;">Session Disconnected</h2>
+    
+    <p style="color: #a0a0a0; margin-bottom: 32px; font-size: 1.1rem;">
+      You have been safely logged out because your account was accessed from another device.
+    </p>
+    
+    <button class="btn-primary" style="width: 100%;" (click)="acknowledgeSessionKick()">
+      Return to Login
+    </button>
+  </div>
+</div>
 </div>
 
 <!-- Logout Confirmation Modal -->
@@ -43,5 +58,20 @@
       <button class="btn-cancel" (click)="cancelLogout()">Cancel</button>
       <button class="btn-primary" (click)="confirmLogout()">Logout</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" *ngIf="nakamaService.isReconnecting() && !nakamaService.sessionKicked()">
+  <div class="modal-card" style="border: 2px solid #fbbf24;">
+    
+    <div style="font-size: 3.5rem; margin-bottom: 8px;">🔌</div>
+    <div class="spinner" style="margin: 0 auto 24px auto; width: 30px; height: 30px; border-width: 3px;"></div>
+    
+    <h2 style="color: #fbbf24; margin-top: 0;">Connection Lost</h2>
+    
+    <p style="color: #a0a0a0; margin-bottom: 0; font-size: 1.1rem;">
+      Trying to reconnect to the server...
+    </p>
+    
   </div>
 </div>

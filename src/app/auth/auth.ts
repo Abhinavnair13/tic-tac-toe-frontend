@@ -18,6 +18,10 @@ export class Auth {
   isLoginMode = signal(true);
   showPassword = signal(false);
   
+  // Modal Signals
+  showNetworkModal = signal(false);
+  showServerModal = signal(false);
+  
   // Form fields
   email = signal('');
   password = signal('');
@@ -53,9 +57,20 @@ export class Auth {
     this.usernameError.set('');
   }
 
+  closeModals() {
+    this.showNetworkModal.set(false);
+    this.showServerModal.set(false);
+  }
+
   async submit() {
     this.clearErrors();
     
+    // 1. Check if the user is completely offline before trying
+    if (!window.navigator.onLine) {
+      this.showNetworkModal.set(true);
+      return;
+    }
+
     if (this.isLoginMode()) {
       if (!this.email() || !this.email().includes('@') || !this.password()) {
         this.errorMessage.set('Invalid email or password');
@@ -96,8 +111,6 @@ export class Auth {
     }
 
     this.isLoading.set(true);
-    
-    // We expect an object back now, not just a boolean
     let result: { success: boolean, message?: string };
     
     if (this.isLoginMode()) {
@@ -117,10 +130,18 @@ export class Auth {
     if (result.success) {
       this.router.navigate(['/home']);
     } else {
+      const msg = (result.message || '').toLowerCase();
+      console.log("Message", msg);
+      // 2. Intercept Server Down / Fetch Failures
+      if (msg.includes('failed to fetch') || msg.includes('network error') || msg.includes('load failed')) {
+        this.showServerModal.set(true);
+        return;
+      }
+
+      // 3. Normal Authentication Errors
       if (this.isLoginMode()) {
         this.errorMessage.set('Invalid email or password');
       } else {
-        const msg = (result.message || '').toLowerCase();
         if (msg.includes('username')) {
           this.usernameError.set(result.message!);
         } else if (msg.includes('email')) {

@@ -3,7 +3,7 @@
   <div class="queue-overlay" *ngIf="matchStatus() === 'QUEUE'">
     <div class="spinner"></div>
     <h3>Finding a random player...</h3>
-    <button class="btn-cancel mt-4" (click)="nakamaService.cancelMatchmaking()">Cancel Search</button>
+    <button class="btn-cancel mt-4" (click)="cancelMatchmaking()">Cancel Search</button>
   </div>
 
   <div class="match-container" *ngIf="matchStatus() === 'ACTIVE' && gameState()">

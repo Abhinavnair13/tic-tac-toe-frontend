@@ -61,7 +61,7 @@ export class Game implements OnInit, OnDestroy {
           this.winningClass.set(wLine);
           setTimeout(() => {
             this.showGameOverModal.set(true);
-          }, 2000);
+          }, 4000);
         } else {
           // It's a Forfeit or Draw: Show modal immediately
           this.showGameOverModal.set(true);

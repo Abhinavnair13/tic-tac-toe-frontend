@@ -79,12 +79,13 @@
 
 .modal-card {
   background-color: #1e1e1e;
-  padding: 32px;
+  padding: 32px 24px;
   border-radius: 12px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   width: 90%;
   max-width: 360px;
+  box-sizing: border-box;
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 

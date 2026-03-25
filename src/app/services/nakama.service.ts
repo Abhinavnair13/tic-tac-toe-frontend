@@ -18,6 +18,9 @@ export class NakamaService {
   private router = inject(Router);
   public myTrophies = signal<number>(0);
   private matchId: string | null = null;
+  public sessionKicked = signal<boolean>(false);
+  public isReconnecting = signal<boolean>(false);
+  private reconnectAttempts = 0;
   private matchmakerTicket: string | null = null;
   public activeMatchId: string | null = null;
   private gameStateSubject = new BehaviorSubject<GameState | null>(null);
@@ -237,9 +240,7 @@ async restoreSession(): Promise<boolean> {
   }
 
   logout() {
-    if (this.socket) {
-      this.socket.disconnect(false);
-    }
+  
     this.session = null as any;
     this.matchStatus.set('LOGIN');
     this.matchId = null;
@@ -247,18 +248,42 @@ async restoreSession(): Promise<boolean> {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.queuePingInterval) clearInterval(this.queuePingInterval);
     this.gameStateSubject.next(null);
-    
+
     localStorage.removeItem('nakama_token');
     localStorage.removeItem('nakama_refresh_token');
     localStorage.removeItem('active_match_id');
+
+    if (this.socket) {
+      this.socket.disconnect(false);
+    }
   }
 
 private setupListeners() {
-  this.socket.ondisconnect = (event) => {
+  this.socket.onnotification = (notification) => {
       this.zone.run(() => {
-        console.error('WebSocket Disconnected!', event);
-        this.logout(); 
-        window.location.href = '/auth'; 
+        if (notification.code === -7 || notification.subject === 'single_socket') {
+          console.warn('Received single_socket kick from server!');
+          this.sessionKicked.set(true); // Trigger the UI modal
+          this.logout(); // Completely wipe localStorage so it CANNOT auto-reconnect
+        }
+      });
+    };
+
+    // 2. HANDLE STANDARD DISCONNECTS safely
+    this.socket.ondisconnect = (event) => {
+      this.zone.run(() => {
+        console.warn('WebSocket Disconnected', event);
+        
+        // THE FIX: Only reconnect if we weren't kicked AND we didn't intentionally log out
+        if (!this.sessionKicked() && this.session) {
+          this.isReconnecting.set(true);
+          this.attemptReconnect();
+        } else if (!this.sessionKicked()) {
+          // We intentionally logged out, so cleanly reset the UI state
+          this.matchStatus.set('LOGIN');
+          this.matchId = null;
+          this.activeMatchId = null;
+        }
       });
     };
     this.socket.onchannelpresence = (presenceEvent) => {
@@ -314,7 +339,47 @@ private setupListeners() {
       });
     };
   }
+private async attemptReconnect() {
+    if (this.sessionKicked()) {
+      this.isReconnecting.set(false);
+      return;
+    }
 
+    // THE UPDATE: Give up after 5 failed attempts and log them out
+    if (this.reconnectAttempts >= 5) {
+      console.error('Failed to reconnect after 5 attempts. Logging out.');
+      this.isReconnecting.set(false);
+      this.reconnectAttempts = 0;
+      this.logout(); // Wipes localStorage and resets all signals
+      this.zone.run(() => {
+        this.router.navigate(['/auth']);
+      });
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`Reconnection attempt ${this.reconnectAttempts}...`);
+
+    try {
+      this.socket = this.client.createSocket();
+      await this.socket.connect(this.session, true);
+      this.setupListeners();
+      await this.joinGlobalChannel();
+      
+      if (this.activeMatchId) {
+        await this.rejoinMatch(this.activeMatchId);
+      }
+
+      this.zone.run(() => {
+        this.isReconnecting.set(false);
+        this.reconnectAttempts = 0;
+      });
+    } catch (err) {
+      setTimeout(() => {
+        this.zone.run(() => this.attemptReconnect());
+      }, 2000);
+    }
+  }
 async sendMove(position: number) {
   if (!this.matchId || !this.socket) return;
   try {
