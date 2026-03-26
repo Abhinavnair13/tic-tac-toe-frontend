@@ -1,4 +1,4 @@
-import { Injectable, signal,NgZone,inject} from '@angular/core';
+import { Injectable, signal, NgZone, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Client, Session, Socket, MatchData } from '@heroiclabs/nakama-js';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -36,9 +36,12 @@ export class NakamaService {
   private lastPingTime: number = 0;
 
   constructor() {
-    this.client = new Client('defaultkey', environment.nakamaHost, 
-    environment.nakamaPort, 
-    environment.nakamaUseSSL);
+    this.client = new Client(
+      'defaultkey', 
+      environment.nakamaHost, 
+      environment.nakamaPort, 
+      environment.nakamaUseSSL
+    );
   }
 
   get myUserId(): string | '' {
@@ -48,56 +51,84 @@ export class NakamaService {
   get myUsername(): string | null {
     return this.session?.username || null;
   }
-  async fetchMyTrophies() {
-    if (!this.session) return;
-    try {
-      // Ask Nakama for just our own leaderboard record
-      const records = await this.client.listLeaderboardRecords(this.session, 'global_trophies', [this.myUserId], 1);
-      if (records.owner_records && records.owner_records.length > 0) {
-        this.myTrophies.set(Number(records.owner_records[0].score) || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch trophies', err);
-    }
-  }
+
   public hasSession(): boolean {
     return !!this.session && !this.session.isexpired(Math.floor(Date.now() / 1000));
   }
-  async getUsers(userIds: string[]) {
-    if (!this.session) return [];
+
+  private async initializeGameSession() {
+    if (this.socket) {
+      try { this.socket.disconnect(false); } catch (e) {}
+    }
+
+    // 2. Create the ONE true socket using the environment's SSL setting
+    this.socket = this.client.createSocket(environment.nakamaUseSSL, false);
+    
+    // 3. Connect and set up the game world
+    await this.socket.connect(this.session, true);
+    this.setupListeners();
+    await this.joinGlobalChannel();
+    this.fetchMyTrophies();
+    await this.checkForActiveMatch();
+  }
+
+  async login(email: string, password: string): Promise<{ success: boolean, message?: string }> {
     try {
-      const response = await this.client.getUsers(this.session, userIds);
-      return response.users || [];
-    } catch (err) {
-      console.error('Failed to fetch user profiles:', err);
-      return [];
+      this.session = await this.client.authenticateEmail(email, password, false);
+      localStorage.setItem('nakama_token', this.session.token); 
+      localStorage.setItem('nakama_refresh_token', this.session.refresh_token); 
+      
+      await this.initializeGameSession(); // Centralized setup!
+      
+      return { success: true };
+    } catch (err: any) {
+      console.error('Login failed', err);
+      return { success: false, message: err.message || 'Login failed' };
     }
   }
-async restoreSession(): Promise<boolean> {
+
+  async register(email: string, password: string, username: string, firstName: string, lastName: string): Promise<{ success: boolean, message?: string }> {
+    try {
+      this.session = await this.client.authenticateEmail(email, password, true, username);
+      
+      // Prevent "Silent Login" if the email already exists
+      if (!this.session.created) {
+        this.session = null as any; 
+        return { success: false, message: 'This email is already registered. Please log in.' };
+      }
+
+      await this.client.updateAccount(this.session, { display_name: `${firstName} ${lastName}` });
+      localStorage.setItem('nakama_token', this.session.token); 
+      localStorage.setItem('nakama_refresh_token', this.session.refresh_token);
+      
+      await this.initializeGameSession(); // Centralized setup!
+      
+      return { success: true };
+    } catch (err: any) {
+      if (err.message && err.message.includes('Invalid credentials')) {
+         return { success: false, message: 'This email is already registered. Please log in.' };
+      }
+      console.error('Registration failed', err);
+      return { success: false, message: err.message || 'Registration failed' };
+    }
+  }
+
+  async restoreSession(): Promise<boolean> {
     const token = localStorage.getItem('nakama_token');
     const refreshToken = localStorage.getItem('nakama_refresh_token'); 
     
     if (!token) return false;
 
     try {
-      // THE FIX: Pass both the token and the refresh token
       this.session = Session.restore(token, refreshToken || '');
       
-      // Check if expired
       if (this.session.isexpired(Math.floor(Date.now() / 1000))) {
-        localStorage.removeItem('nakama_token');
-        localStorage.removeItem('nakama_refresh_token'); // NEW
+        this.clearLocalData();
         return false;
       }
 
-      // Reconnect Socket
-      this.socket = this.client.createSocket(environment.nakamaUseSSL, false);
-      await this.socket.connect(this.session, true);
-      this.setupListeners();
-      await this.joinGlobalChannel();
-      this.fetchMyTrophies();
+      await this.initializeGameSession(); // Centralized setup!
 
-      // DID WE REFRESH DURING A MATCH?
       const savedMatchId = localStorage.getItem('active_match_id');
       if (savedMatchId) {
         await this.rejoinMatch(savedMatchId);
@@ -105,13 +136,73 @@ async restoreSession(): Promise<boolean> {
 
       return true;
     } catch (err) {
-      localStorage.removeItem('nakama_token');
-      localStorage.removeItem('nakama_refresh_token'); // NEW
+      this.clearLocalData();
       return false;
     }
   }
 
-  // 2. Helper to reconnect to an orphaned match
+  logout() {
+    this.session = null as any;
+    this.matchStatus.set('LOGIN');
+    this.matchId = null;
+    this.activeMatchId = null;
+    this.matchmakerTicket = null;
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    if (this.queuePingInterval) clearInterval(this.queuePingInterval);
+    this.gameStateSubject.next(null);
+
+    this.clearLocalData();
+
+    if (this.socket) {
+      try { this.socket.disconnect(false); } catch (e) {}
+      this.socket = null as any; // Wipe the socket completely
+    }
+  }
+
+  private clearLocalData() {
+    localStorage.removeItem('nakama_token');
+    localStorage.removeItem('nakama_refresh_token');
+    localStorage.removeItem('active_match_id');
+  }
+
+  private async attemptReconnect() {
+    if (this.sessionKicked()) {
+      this.isReconnecting.set(false);
+      return;
+    }
+
+    if (this.reconnectAttempts >= 5) {
+      console.error('Failed to reconnect after 5 attempts. Logging out.');
+      this.isReconnecting.set(false);
+      this.reconnectAttempts = 0;
+      this.logout(); 
+      this.zone.run(() => {
+        this.router.navigate(['/auth']);
+      });
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`Reconnection attempt ${this.reconnectAttempts}...`);
+
+    try {
+      await this.initializeGameSession(); // Centralized setup!
+      
+      if (this.activeMatchId) {
+        await this.rejoinMatch(this.activeMatchId);
+      }
+
+      this.zone.run(() => {
+        this.isReconnecting.set(false);
+        this.reconnectAttempts = 0;
+      });
+    } catch (err) {
+      setTimeout(() => {
+        this.zone.run(() => this.attemptReconnect());
+      }, 2000);
+    }
+  }
+
   async rejoinMatch(matchId: string) {
     try {
       const match = await this.socket.joinMatch(matchId);
@@ -120,10 +211,9 @@ async restoreSession(): Promise<boolean> {
         this.activeMatchId = match.match_id;
         this.matchStatus.set('ACTIVE');
         this.startPingHeartbeat();
-        this.router.navigate(['/play']); // Force them to the board!
+        this.router.navigate(['/play']); 
       });
     } catch (err) {
-      // Match already ended on server, clear it
       localStorage.removeItem('active_match_id');
       this.activeMatchId = null;
     }
@@ -137,8 +227,6 @@ async restoreSession(): Promise<boolean> {
       });
       
       if (storage.objects && storage.objects.length > 0) {
-        
-        // THE FIX: Safely parse the JSON string from Nakama Storage
         const rawValue = storage.objects[0].value;
         const data = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
         
@@ -149,53 +237,6 @@ async restoreSession(): Promise<boolean> {
       }
     } catch (err) {
       console.warn('No active cross-device match found.');
-    }
-  }
-
-  async login(email: string, password: string): Promise<{ success: boolean, message?: string }> {
-    try {
-      this.session = await this.client.authenticateEmail(email, password, false);
-      localStorage.setItem('nakama_token', this.session.token); 
-      localStorage.setItem('nakama_refresh_token', this.session.refresh_token); 
-      this.socket = this.client.createSocket();
-      await this.socket.connect(this.session, true);
-      this.setupListeners();
-      await this.joinGlobalChannel();
-      this.fetchMyTrophies();
-      await this.checkForActiveMatch(); // NEW
-      return { success: true };
-    } catch (err: any) {
-      console.error('Login failed', err);
-      return { success: false, message: err.message || 'Login failed' };
-    }
-  }
-
-  async register(email: string, password: string, username: string, firstName: string, lastName: string): Promise<{ success: boolean, message?: string }> {
-    try {
-      this.session = await this.client.authenticateEmail(email, password, true, username);
-      await this.client.updateAccount(this.session, { display_name: `${firstName} ${lastName}` });
-      localStorage.setItem('nakama_token', this.session.token); 
-      localStorage.setItem('nakama_refresh_token', this.session.refresh_token);
-      this.socket = this.client.createSocket();
-      await this.socket.connect(this.session, true);
-      this.setupListeners();
-      await this.joinGlobalChannel();
-      this.fetchMyTrophies();
-      await this.checkForActiveMatch(); // NEW
-      return { success: true };
-    } catch (err: any) {
-      console.error('Registration failed', err);
-      return { success: false, message: err.message || 'Registration failed' };
-    }
-  }
-
-  async getLeaderboard() {
-    if (!this.session) return null;
-    try {
-      return await this.client.listLeaderboardRecords(this.session, 'global_trophies');
-    } catch (err) {
-      console.error('Failed to get leaderboard updates', err);
-      return null;
     }
   }
 
@@ -210,9 +251,7 @@ async restoreSession(): Promise<boolean> {
     const matchmakerResponse = await this.socket.addMatchmaker(query, 2, 2, stringProps);
     this.matchmakerTicket = matchmakerResponse.ticket;
 
-    // Fake a ping metric while in queue using a dummy HTTP call
     if (this.queuePingInterval) clearInterval(this.queuePingInterval);
-    // Do an immediate ping
     this.measureHttpPing();
     this.queuePingInterval = setInterval(() => {
       if (this.matchStatus() === 'QUEUE') {
@@ -226,7 +265,6 @@ async restoreSession(): Promise<boolean> {
   private async measureHttpPing() {
     const start = Date.now();
     try {
-      // Very lightweight call to measure API server latency
       await this.client.getAccount(this.session);
       this.ping.set(Date.now() - start);
     } catch { }
@@ -247,13 +285,12 @@ async restoreSession(): Promise<boolean> {
     }
   }
 
- async leaveMatch() {
+  async leaveMatch() {
     if (!this.socket || !this.matchId) {
-      this.gameStateSubject.next(null); // Catch-all
+      this.gameStateSubject.next(null); 
       return;
     }
     try {
-      // This might throw an error if the server already destroyed the match instance
       await this.socket.leaveMatch(this.matchId);
       localStorage.removeItem('active_match_id');
     } catch (err) {
@@ -267,59 +304,113 @@ async restoreSession(): Promise<boolean> {
     }
   }
 
-  logout() {
-  
-    this.session = null as any;
-    this.matchStatus.set('LOGIN');
-    this.matchId = null;
-    this.matchmakerTicket = null;
-    if (this.pingInterval) clearInterval(this.pingInterval);
-    if (this.queuePingInterval) clearInterval(this.queuePingInterval);
-    this.gameStateSubject.next(null);
-
-    localStorage.removeItem('nakama_token');
-    localStorage.removeItem('nakama_refresh_token');
-    localStorage.removeItem('active_match_id');
-
-    if (this.socket) {
-      this.socket.disconnect(false);
+  async sendMove(position: number) {
+    if (!this.matchId || !this.socket) return;
+    try {
+      const payload = tictactoe.MoveRequest.create({ position });
+      const encoded = tictactoe.MoveRequest.encode(payload).finish().slice(); 
+      await this.socket.sendMatchState(this.matchId, 1, encoded);
+    } catch (err) {
+      console.error("Failed to send move over WebSocket:", err);
     }
   }
 
-private setupListeners() {
-  this.socket.onnotification = (notification) => {
+  async fetchMyTrophies() {
+    if (!this.session) return;
+    try {
+      const records = await this.client.listLeaderboardRecords(this.session, 'global_trophies', [this.myUserId], 1);
+      if (records.owner_records && records.owner_records.length > 0) {
+        this.myTrophies.set(Number(records.owner_records[0].score) || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch trophies', err);
+    }
+  }
+
+  async getUsers(userIds: string[]) {
+    if (!this.session) return [];
+    try {
+      const response = await this.client.getUsers(this.session, userIds);
+      return response.users || [];
+    } catch (err) {
+      console.error('Failed to fetch user profiles:', err);
+      return [];
+    }
+  }
+
+  async getLeaderboard() {
+    if (!this.session) return null;
+    try {
+      return await this.client.listLeaderboardRecords(this.session, 'global_trophies');
+    } catch (err) {
+      console.error('Failed to get leaderboard updates', err);
+      return null;
+    }
+  }
+
+  async getProfileData() {
+    if (!this.session) return null;
+    try {
+      const account = await this.client.getAccount(this.session);
+      const storage = await this.client.readStorageObjects(this.session, {
+        object_ids: [{ collection: 'stats', key: 'profile', user_id: this.myUserId }]
+      });
+
+      let stats = { wins: 0, losses: 0, streak: 0 };
+      if (storage.objects && storage.objects.length > 0) {
+        stats = storage.objects[0].value as any;
+      }
+      return { account, stats };
+    } catch (err) {
+      console.error('Failed to fetch profile', err);
+      return null;
+    }
+  }
+
+  async getLeaderboardWithStats() {
+    if (!this.session) return [];
+    try {
+      const response = await this.client.rpc(this.session, 'get_leaderboard_with_stats', {});
+      if (response.payload) {
+        return typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
+      }
+      return [];
+    } catch (err) {
+      console.error('Failed to fetch leaderboard rpc', err);
+      return [];
+    }
+  }
+
+  private setupListeners() {
+    this.socket.onnotification = (notification) => {
       this.zone.run(() => {
         if (notification.code === -7 || notification.subject === 'single_socket') {
           console.warn('Received single_socket kick from server!');
-          this.sessionKicked.set(true); // Trigger the UI modal
-          this.logout(); // Completely wipe localStorage so it CANNOT auto-reconnect
+          this.sessionKicked.set(true); 
+          this.logout(); 
         }
       });
     };
 
-    // 2. HANDLE STANDARD DISCONNECTS safely
     this.socket.ondisconnect = (event) => {
       this.zone.run(() => {
         console.warn('WebSocket Disconnected', event);
-        
-        // THE FIX: Only reconnect if we weren't kicked AND we didn't intentionally log out
         if (!this.sessionKicked() && this.session) {
           this.isReconnecting.set(true);
           this.attemptReconnect();
         } else if (!this.sessionKicked()) {
-          // We intentionally logged out, so cleanly reset the UI state
           this.matchStatus.set('LOGIN');
           this.matchId = null;
           this.activeMatchId = null;
         }
       });
     };
+
     this.socket.onchannelpresence = (presenceEvent) => {
       this.zone.run(() => {
         if (this.globalChannel && presenceEvent.channel_id === this.globalChannel.id) {
           const joins = presenceEvent.joins?.filter(p => p.user_id !== this.myUserId).length || 0;
           const leaves = presenceEvent.leaves?.filter(p => p.user_id !== this.myUserId).length || 0;
-   
           this.onlinePlayers.update(count => count + joins - leaves);
         }
       });
@@ -327,7 +418,6 @@ private setupListeners() {
 
     this.socket.onmatchmakermatched = async (matched) => {
       const match = await this.socket.joinMatch(matched.match_id, matched.token);
-      
       this.zone.run(() => {
         this.matchId = match.match_id;
         localStorage.setItem('active_match_id', match.match_id);
@@ -338,9 +428,7 @@ private setupListeners() {
 
     this.socket.onmatchdata = (matchData: MatchData) => {
       this.zone.run(() => {
-        
         const opCode = Number(matchData.op_code);
-
         switch (opCode) {
           case 2:
             let buffer = matchData.data as any;
@@ -351,15 +439,11 @@ private setupListeners() {
             }
 
             const decoded = tictactoe.GameState.decode(buffer);
-            
-            // THE FIX: If ProtobufJS drops the zero-filled array, recreate it!
             if (!decoded.board || decoded.board.length === 0) {
               decoded.board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
             }
-            
             this.gameStateSubject.next(decoded as unknown as GameState);
             break;
-            
           case 4:
             const rtt = Date.now() - this.lastPingTime;
             this.ping.set(rtt);
@@ -368,68 +452,9 @@ private setupListeners() {
       });
     };
   }
-private async attemptReconnect() {
-    if (this.sessionKicked()) {
-      this.isReconnecting.set(false);
-      return;
-    }
-
-    // THE UPDATE: Give up after 5 failed attempts and log them out
-    if (this.reconnectAttempts >= 5) {
-      console.error('Failed to reconnect after 5 attempts. Logging out.');
-      this.isReconnecting.set(false);
-      this.reconnectAttempts = 0;
-      this.logout(); // Wipes localStorage and resets all signals
-      this.zone.run(() => {
-        this.router.navigate(['/auth']);
-      });
-      return;
-    }
-
-    this.reconnectAttempts++;
-    console.log(`Reconnection attempt ${this.reconnectAttempts}...`);
-
-    try {
-      this.socket = this.client.createSocket();
-      await this.socket.connect(this.session, true);
-      this.setupListeners();
-      await this.joinGlobalChannel();
-      
-      if (this.activeMatchId) {
-        await this.rejoinMatch(this.activeMatchId);
-      }
-
-      this.zone.run(() => {
-        this.isReconnecting.set(false);
-        this.reconnectAttempts = 0;
-      });
-    } catch (err) {
-      setTimeout(() => {
-        this.zone.run(() => this.attemptReconnect());
-      }, 2000);
-    }
-  }
-async sendMove(position: number) {
-  if (!this.matchId || !this.socket) return;
-  try {
-    const payload = tictactoe.MoveRequest.create({ position });
-    
-    // THE FIX: Add .slice() to break out of the 8KB memory pool!
-    // This creates a fresh, exact-sized copy (usually just 2 bytes)
-    const encoded = tictactoe.MoveRequest.encode(payload).finish().slice(); 
-    
-    // Now Nakama will send a tiny, clean payload like "CAA="
-    await this.socket.sendMatchState(this.matchId, 1, encoded);
-    
-    console.log("Move successfully sent to the server!");
-  } catch (err) {
-    console.error("Failed to send move over WebSocket:", err);
-  }
-}
 
   private startPingHeartbeat() {
     if (this.pingInterval) clearInterval(this.pingInterval);
-    
     this.pingInterval = setInterval(() => {
       if (this.matchId && this.socket) {
         this.lastPingTime = Date.now();
@@ -441,55 +466,17 @@ async sendMove(position: number) {
   private async joinGlobalChannel() {
     try {
       this.globalChannel = await this.socket.joinChat('Global', 1, false, false);
-      
       if (!this.globalChannel.presences) {
         this.globalChannel.presences = [];
       }
-      
       const existingPlayers = this.globalChannel.presences.length;
       this.onlinePlayers.set(existingPlayers + 1);
     } catch (err) {
       console.error('Failed to join global channel', err);
     }
   }
-  async getProfileData() {
-    if (!this.session) return null;
-    try {
-      // Fetch Account details (Name, Username, Email)
-      const account = await this.client.getAccount(this.session);
-      
-      // Fetch Custom Stats from the Storage Engine
-      const storage = await this.client.readStorageObjects(this.session, {
-        object_ids: [{ collection: 'stats', key: 'profile', user_id: this.myUserId }]
-      });
 
-      let stats = { wins: 0, losses: 0, streak: 0 };
-      if (storage.objects && storage.objects.length > 0) {
-        stats = storage.objects[0].value as any;
-      }
-
-      return { account, stats };
-    } catch (err) {
-      console.error('Failed to fetch profile', err);
-      return null;
-    }
-  }
   getSession(): Session | null {
     return this.session;
-  }
-
-  async getLeaderboardWithStats() {
-    if (!this.session) return [];
-    try {
-      const response = await this.client.rpc(this.session, 'get_leaderboard_with_stats', {});
-      
-      if (response.payload) {
-        return typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
-      }
-      return [];
-    } catch (err) {
-      console.error('Failed to fetch leaderboard rpc', err);
-      return [];
-    }
   }
 }
