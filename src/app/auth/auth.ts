@@ -128,7 +128,10 @@ export class Auth {
     this.isLoading.set(false);
     
     if (result.success) {
-      this.router.navigate(['/home']);
+      // THE FIX: Only route to home if the service didn't already throw us into an active match!
+      if (!this.nakamaService.activeMatchId) {
+        this.router.navigate(['/home']);
+      }
     } else {
       const msg = (result.message || '').toLowerCase();
       console.log("Message", msg);

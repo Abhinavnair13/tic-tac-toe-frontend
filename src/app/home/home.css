@@ -133,3 +133,31 @@
     opacity: 1;
   }
 }
+
+.online-indicator {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  background-color: rgba(18, 18, 18, 0.6);
+  border: 1px solid rgba(77, 184, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  color: #4db8ff;
+  box-shadow: 0 0 15px rgba(77, 184, 255, 0.15);
+}
+
+.neon-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #4db8ff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #4db8ff, 0 0 12px #4db8ff;
+  animation: neon-pulse 2s infinite alternate;
+}

@@ -14,6 +14,7 @@ import { NakamaService } from '../services/nakama.service';
 export class Game implements OnInit, OnDestroy {
   private router = inject(Router);
   public nakamaService = inject(NakamaService);
+  opponentTimer = signal<number>(0);
   opponentName = signal<string | null>(null);
   private fetchedUsers = false;
   matchStatus = this.nakamaService.matchStatus;
@@ -76,22 +77,34 @@ export class Game implements OnInit, OnDestroy {
       this.updateTimer();
     }, 1000);
 
-    this.nakamaService.joinMatchmaking();
+    if (this.nakamaService.matchStatus() !== 'ACTIVE') {
+      this.nakamaService.joinMatchmaking();
+    }
   }
   updateTimer() {
-    if (!this.isTimedMode()) {
-      return;
+    // --- Existing Turn Timer Logic ---
+    if (this.isTimedMode()) {
+      const state = this.gameState();
+      if (state && (state.turnStartTime || state.turn_start_time)) {
+        const turnStartTime = Number(state.turnStartTime || state.turn_start_time);
+        const now = Math.floor(Date.now() / 1000);
+        const elapsed = now - turnStartTime;
+        const remaining = Math.max(0, 30 - elapsed);
+        this.timeLeft.set(remaining);
+      } else {
+        this.timeLeft.set(30);
+      }
     }
 
-    const state = this.gameState();
-    if (state && (state.turnStartTime || state.turn_start_time)) {
-      const turnStartTime = Number(state.turnStartTime || state.turn_start_time);
+    // --- NEW: Disconnect Countdown Logic ---
+    const dTime = this.opponentDisconnectTime();
+    // Only tick down if someone disconnected AND the game isn't already over
+    if (dTime > 0 && !this.getWinner()) {
       const now = Math.floor(Date.now() / 1000);
-      const elapsed = now - turnStartTime;
-      const remaining = Math.max(0, 30 - elapsed);
-      this.timeLeft.set(remaining);
+      const elapsed = now - dTime;
+      this.opponentTimer.set(Math.max(0, 15 - elapsed));
     } else {
-      this.timeLeft.set(30);
+      this.opponentTimer.set(0);
     }
   }
   isTimedMode(): boolean {
@@ -120,15 +133,6 @@ export class Game implements OnInit, OnDestroy {
     // Return the other guy's disconnect time
     if (this.myUserId === p1) return Number(s.p2DisconnectTime || s.p2_disconnect_time || 0);
     return Number(s.p1DisconnectTime || s.p1_disconnect_time || 0);
-  }
-
-  opponentReconnectCountdown(): number {
-    const dTime = this.opponentDisconnectTime();
-    if (dTime === 0) return 0;
-    
-    const now = Math.floor(Date.now() / 1000);
-    const elapsed = now - dTime;
-    return Math.max(0, 15 - elapsed);
   }
 
   getEarnedTrophies(): number {

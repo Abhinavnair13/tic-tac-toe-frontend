@@ -4,7 +4,7 @@ import { Client, Session, Socket, MatchData } from '@heroiclabs/nakama-js';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { GameState } from '../models/game-state.model';
 import { tictactoe } from '../tictactoe.js';
-
+import { environment } from '../../../environment';
 
 @Injectable({
   providedIn: 'root'
@@ -36,7 +36,9 @@ export class NakamaService {
   private lastPingTime: number = 0;
 
   constructor() {
-    this.client = new Client('defaultkey', '127.0.0.1', '7350', false);
+    this.client = new Client('defaultkey', environment.nakamaHost, 
+    environment.nakamaPort, 
+    environment.nakamaUseSSL);
   }
 
   get myUserId(): string | '' {
@@ -126,6 +128,30 @@ async restoreSession(): Promise<boolean> {
       this.activeMatchId = null;
     }
   }
+
+  async checkForActiveMatch() {
+    if (!this.session) return;
+    try {
+      const storage = await this.client.readStorageObjects(this.session, {
+        object_ids: [{ collection: 'system', key: 'active_match', user_id: this.myUserId }]
+      });
+      
+      if (storage.objects && storage.objects.length > 0) {
+        
+        // THE FIX: Safely parse the JSON string from Nakama Storage
+        const rawValue = storage.objects[0].value;
+        const data = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+        
+        if (data && data.match_id) {
+          console.log("Found active cross-device match, rejoining!");
+          await this.rejoinMatch(data.match_id);
+        }
+      }
+    } catch (err) {
+      console.warn('No active cross-device match found.');
+    }
+  }
+
   async login(email: string, password: string): Promise<{ success: boolean, message?: string }> {
     try {
       this.session = await this.client.authenticateEmail(email, password, false);
@@ -136,6 +162,7 @@ async restoreSession(): Promise<boolean> {
       this.setupListeners();
       await this.joinGlobalChannel();
       this.fetchMyTrophies();
+      await this.checkForActiveMatch(); // NEW
       return { success: true };
     } catch (err: any) {
       console.error('Login failed', err);
@@ -154,6 +181,7 @@ async restoreSession(): Promise<boolean> {
       this.setupListeners();
       await this.joinGlobalChannel();
       this.fetchMyTrophies();
+      await this.checkForActiveMatch(); // NEW
       return { success: true };
     } catch (err: any) {
       console.error('Registration failed', err);
@@ -289,8 +317,9 @@ private setupListeners() {
     this.socket.onchannelpresence = (presenceEvent) => {
       this.zone.run(() => {
         if (this.globalChannel && presenceEvent.channel_id === this.globalChannel.id) {
-          const joins = presenceEvent.joins?.length || 0;
-          const leaves = presenceEvent.leaves?.length || 0;
+          const joins = presenceEvent.joins?.filter(p => p.user_id !== this.myUserId).length || 0;
+          const leaves = presenceEvent.leaves?.filter(p => p.user_id !== this.myUserId).length || 0;
+   
           this.onlinePlayers.update(count => count + joins - leaves);
         }
       });
