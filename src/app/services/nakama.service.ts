@@ -91,7 +91,7 @@ async restoreSession(): Promise<boolean> {
       }
 
       // Reconnect Socket
-      this.socket = this.client.createSocket();
+      this.socket = this.client.createSocket(environment.nakamaUseSSL, false);
       await this.socket.connect(this.session, true);
       this.setupListeners();
       await this.joinGlobalChannel();
