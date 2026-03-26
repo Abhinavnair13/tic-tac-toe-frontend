@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  nakamaHost: 'apinakama.jsdevelop.cloud',
+  nakamaHost: 'apinakama.jsdeveloper.cloud',
   nakamaPort: '443',
   nakamaUseSSL: true
 };
